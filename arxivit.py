@@ -71,6 +71,7 @@ def arxivit(
     input_file: Path,
     output_dir: Path,
     image_options_list: list[tuple[Callable[[Path], bool], ImageOptions]],
+    keep_bbl: bool,
     debug: bool,
 ):
     input_file = input_file.resolve()
@@ -87,39 +88,40 @@ def arxivit(
             print(deps_file.read_text())
 
         deps, bbl_files, image_infos = parse_compile_log(stdout, deps_file)
-        if len(bbl_files) == 0:
-            console.log(
-                "Warning: No bbl files found in compile log. "
-                "This is expected if you don't use bibtex.",
-                style="yellow",
-            )
-            if (f := compile_dir / input_file.with_suffix(".bbl").name).exists():
+        if keep_bbl:
+            if len(bbl_files) == 0:
                 console.log(
-                    f"Info: Found bbl file {f} in compile directory.",
-                    style="blue",
-                )
-                bbl_files.append(f.absolute())
-            elif (f := input_file.with_suffix(".bbl")).exists():
-                console.log(
-                    f"Info: Found bbl file {f} in input directory.",
-                    style="blue",
-                )
-                bbl_files.append(f)
-            else:
-                console.log(
-                    "Warning: No bbl file found in the input or compile directories. "
-                    "You might need to run bibtex manually.",
+                    "Warning: No bbl files found in compile log. "
+                    "This is expected if you don't use bibtex.",
                     style="yellow",
                 )
-        elif len(bbl_files) > 1:
-            console.log(
-                f"Warning: Found more than one ({len(bbl_files)}) bbl files in compile log.",
-                style="yellow",
-            )
-        for bbl_file in bbl_files:
-            deps.append(
-                bbl_file if bbl_file.is_absolute() else input_file.parent / bbl_file
-            )
+                if (f := compile_dir / input_file.with_suffix(".bbl").name).exists():
+                    console.log(
+                        f"Info: Found bbl file {f} in compile directory.",
+                        style="blue",
+                    )
+                    bbl_files.append(f.absolute())
+                elif (f := input_file.with_suffix(".bbl")).exists():
+                    console.log(
+                        f"Info: Found bbl file {f} in input directory.",
+                        style="blue",
+                    )
+                    bbl_files.append(f)
+                else:
+                    console.log(
+                        "Warning: No bbl file found in the input or compile directories. "
+                        "You might need to run bibtex manually.",
+                        style="yellow",
+                    )
+            elif len(bbl_files) > 1:
+                console.log(
+                    f"Warning: Found more than one ({len(bbl_files)}) bbl files in compile log.",
+                    style="yellow",
+                )
+            for bbl_file in bbl_files:
+                deps.append(
+                    bbl_file if bbl_file.is_absolute() else input_file.parent / bbl_file
+                )
 
         def merge_image_infos(image_infos: list[ImageInfo]) -> dict[str, ImageInfo]:
             d: dict[str, ImageInfo] = {}
@@ -469,6 +471,11 @@ def cli():
         help="Default JPEG quality (0-100) when not explicitly provided with e.g. 'jpeg@95'.",
     )
     parser.add_argument(
+        "--keep-bbl",
+        action="store_true",
+        help="Keep .bbl files. arXiv required those in the past, it is no longer needed.",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Keep temporary files and show more detailed output.",
@@ -503,7 +510,13 @@ def cli():
         if archive_format:
             with tempfile.TemporaryDirectory() as tmp_output:
                 tmp_output = Path(tmp_output)
-                arxivit(input_file, tmp_output, image_options_list, debug=args.debug)
+                arxivit(
+                    input_file,
+                    tmp_output,
+                    image_options_list,
+                    keep_bbl=args.keep_bbl,
+                    debug=args.debug,
+                )
                 shutil.make_archive(str(archive_base), archive_format, tmp_output)
                 if args.compile:
                     with console.status(Text("Compiling arXiv LaTeX")):
@@ -538,7 +551,13 @@ def cli():
             if output.exists():
                 shutil.rmtree(output)
             os.makedirs(output)
-            arxivit(input_file, output, image_options_list, debug=args.debug)
+            arxivit(
+                input_file,
+                output,
+                image_options_list,
+                keep_bbl=args.keep_bbl,
+                debug=args.debug,
+            )
 
         console.print(
             Text("🎉 Done! Output saved to ")
