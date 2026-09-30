@@ -21,7 +21,13 @@ arxivit /path/to/paper/main.tex --image-options 'jpeg,300dpi' --output /path/to/
 
 # Convert images to max 300 DPI in the final PDF, images in figures/pca/ to max 1000px
 arxivit /path/to/paper/main.tex --image-options '300dpi' --image-options 'figures/pca/*:1000px'
+
+# Losslessly optimize all output PNGs with oxipng
+arxivit /path/to/paper/main.tex --oxipng
 ```
+
+Use `--oxipng` for a good default, or `--oxipng=LEVEL` to select `0`–`6` or `max`.
+All levels are lossless; `max` takes much longer. Requires `oxipng` on `PATH`.
 
 For more options, run:  
 

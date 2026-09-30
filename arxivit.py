@@ -7,7 +7,7 @@ import tempfile
 from dataclasses import dataclass
 from importlib import metadata
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Literal
 
 import pathspec
 from humanize import naturalsize
@@ -73,6 +73,7 @@ def arxivit(
     image_options_list: list[tuple[Callable[[Path], bool], ImageOptions]],
     keep_bbl: bool,
     debug: bool,
+    oxipng_level: str | Literal[False] | None = False,
 ):
     input_file = input_file.resolve()
     with tempfile.TemporaryDirectory(delete=not debug) as compile_dir:
@@ -166,6 +167,7 @@ def arxivit(
                     output_dir / dep.name,
                     image_info,
                     image_options,
+                    oxipng_level=oxipng_level,
                 )
             else:
                 dst = output_dir / dep
@@ -180,6 +182,7 @@ def arxivit(
                     dst,
                     image_info,
                     image_options,
+                    oxipng_level=oxipng_level,
                 )
             console.print(
                 Text(f"   - {str(dep)}  ")
@@ -202,6 +205,7 @@ def process_dependency(
     dst: Path,
     image_info: ImageInfo | None,
     image_options: ImageOptions | None,
+    oxipng_level: str | Literal[False] | None = False,
 ) -> tuple[str | None, str | None, int, int]:
     status_before = None
     status_after = None
@@ -212,7 +216,7 @@ def process_dependency(
             status_after = process_pdf(dep, dst, image_info, image_options)
         case ".png" | ".jpg" | ".jpeg":
             status_before, status_after = process_image(
-                dep, dst, image_info, image_options
+                dep, dst, image_info, image_options, oxipng_level=oxipng_level
             )
         case _:
             shutil.copy(dep, dst)
@@ -233,6 +237,7 @@ def process_image(
     dst: Path,
     image_info: ImageInfo | None,
     image_options: ImageOptions | None,
+    oxipng_level: str | Literal[False] | None = False,
 ) -> tuple[str, str | None]:
     with Image.open(src) as im:
         status_before = f"{im.size[0]}×{im.size[1]} {im.format}"
@@ -326,7 +331,21 @@ def process_image(
                     shutil.copy(src, dst)  # avoid re-enconding jpeg
         else:
             shutil.copy(src, dst)
-        return status_before, status_after
+
+    if oxipng_level is not False:
+        with Image.open(dst) as im:
+            is_png = im.format == "PNG"
+        if is_png:
+            command = ["oxipng"]
+            if oxipng_level is not None:
+                command.extend(["--opt", oxipng_level])
+            subprocess.run(
+                [*command, "--", dst],
+                check=True,
+                capture_output=True,
+            )
+            status_after = f"{status_after}, oxipng" if status_after else "oxipng"
+    return status_before, status_after
 
 
 def process_pdf(
@@ -475,6 +494,17 @@ def cli():
         help="Default JPEG quality (0-100) when not explicitly provided with e.g. 'jpeg@95'.",
     )
     parser.add_argument(
+        "--oxipng",
+        dest="oxipng_level",
+        type=str,
+        nargs="?",
+        const=None,
+        default=False,
+        choices=[str(level) for level in range(7)] + ["max"],
+        metavar="LEVEL",
+        help="Losslessly optimize output PNGs with oxipng (requires oxipng on PATH; level 0-6 or max; omit LEVEL to use oxipng's default).",
+    )
+    parser.add_argument(
         "--keep-bbl",
         action="store_true",
         help="Keep .bbl files. arXiv required those in the past, it is no longer needed.",
@@ -486,6 +516,9 @@ def cli():
     )
 
     args = parser.parse_args()
+
+    if args.oxipng_level is not False and shutil.which("oxipng") is None:
+        parser.error("--oxipng requires oxipng to be installed and available on PATH")
 
     image_options_list = [
         parse_image_options(opt, args.jpeg_quality) for opt in args.image_options
@@ -520,6 +553,7 @@ def cli():
                     image_options_list,
                     keep_bbl=args.keep_bbl,
                     debug=args.debug,
+                    oxipng_level=args.oxipng_level,
                 )
                 shutil.make_archive(str(archive_base), archive_format, tmp_output)
                 if args.compile:
@@ -561,6 +595,7 @@ def cli():
                 image_options_list,
                 keep_bbl=args.keep_bbl,
                 debug=args.debug,
+                oxipng_level=args.oxipng_level,
             )
 
         console.print(
