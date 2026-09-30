@@ -290,6 +290,7 @@ def process_image(
                             "JPEG",
                             dpi=new_dpi,
                             quality=image_options.jpeg_quality,
+                            optimize=True,
                         )
                         status_after += f" JPEG@{image_options.jpeg_quality}"
                     except OSError as e:  # color mode not supported
@@ -298,6 +299,7 @@ def process_image(
                             dst,
                             im.format,
                             dpi=new_dpi,
+                            optimize=True,
                         )
                 else:
                     im_resized.save(
@@ -305,6 +307,7 @@ def process_image(
                         im.format,
                         dpi=new_dpi,
                         quality=image_options.jpeg_quality,  # only relevant for JPEG
+                        optimize=True,
                     )
             else:
                 if to_jpeg:
@@ -313,6 +316,7 @@ def process_image(
                             dst,
                             "JPEG",
                             quality=image_options.jpeg_quality,
+                            optimize=True,
                         )
                         status_after = f"JPEG@{image_options.jpeg_quality}"
                     except OSError as e:  # color mode not supported
