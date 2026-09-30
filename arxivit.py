@@ -63,6 +63,7 @@ class ImageOptions:
     sizes: list[SizeValue]
     jpeg: bool
     jpeg_quality: int
+    background: str | None = None
 
 
 class CliError(Exception):
@@ -242,13 +243,22 @@ def process_image(
     oxipng_level: str | Literal[False] | None = False,
 ) -> tuple[str, str | None]:
     with Image.open(src) as im:
-        status_before = f"{im.size[0]}×{im.size[1]} {im.format}"
+        original_format = im.format
+        status_before = f"{im.size[0]}×{im.size[1]} {original_format}"
         status_after = None
         if image_options:
-            to_jpeg = image_options.jpeg and im.format != "JPEG"
-            if to_jpeg and im.mode == "RGBA":
+            to_jpeg = image_options.jpeg and original_format != "JPEG"
+            apply_background = image_options.background is not None and (
+                im.mode in ("RGBA", "LA") or "transparency" in im.info
+            )
+            if apply_background:
+                background = Image.new("RGB", im.size, image_options.background)
+                background.paste(im, mask=im.convert("RGBA").getchannel("A"))
+                background.info = im.info.copy()
+                background.info.pop("transparency", None)
+                im = background
+            elif to_jpeg and im.mode == "RGBA":
                 alpha = im.getchannel("A")
-                # Check if all alpha values are 255 (fully opaque)
                 if alpha.getextrema()[0] == 255:  # type: ignore
                     im = im.convert("RGB")
                 # else: will error later
@@ -304,14 +314,14 @@ def process_image(
                         console.log(f"Error: {str(e)}", style="red")
                         im_resized.save(
                             dst,
-                            im.format,
+                            original_format,
                             dpi=new_dpi,
                             optimize=True,
                         )
                 else:
                     im_resized.save(
                         dst,
-                        im.format,
+                        original_format,
                         dpi=new_dpi,
                         quality=image_options.jpeg_quality,  # only relevant for JPEG
                         optimize=True,
@@ -329,8 +339,16 @@ def process_image(
                     except OSError as e:  # color mode not supported
                         console.log(f"Error: {str(e)}", style="red")
                         shutil.copy(src, dst)
+                elif apply_background:
+                    im.save(dst, original_format, optimize=True, dpi=im.info.get("dpi"))
                 else:
                     shutil.copy(src, dst)  # avoid re-enconding jpeg
+            if apply_background:
+                status_after = (
+                    f"{status_after}, background@{image_options.background}"
+                    if status_after
+                    else f"background@{image_options.background}"
+                )
         else:
             shutil.copy(src, dst)
 
@@ -439,6 +457,7 @@ def parse_image_options(
     options = options.split(",")
     size = []
     jpeg = False
+    background = None
     for opt in options:
         if opt.endswith("dpi"):
             size.append(DpiValue(int(opt[:-3])))
@@ -448,13 +467,17 @@ def parse_image_options(
             if "@" in opt:
                 jpeg_quality = int(opt.split("@")[1])
             jpeg = True
+        elif opt.startswith("background@"):
+            background = opt.split("@", 1)[1]
         elif opt == "":
             pass
         else:
             raise CliError(f"Invalid image option: {opt}")
     return pathspec.PathSpec.from_lines(
         "gitwildmatch", [path]
-    ).match_file if path else lambda _: True, ImageOptions(size, jpeg, jpeg_quality)
+    ).match_file if path else lambda _: True, ImageOptions(
+        size, jpeg, jpeg_quality, background
+    )
 
 
 def cli():
@@ -489,7 +512,7 @@ def cli():
         default=[],
         action="extend",
         nargs="+",
-        help="Provide options for image processing in the form '[path:]options'. path: is optional and can be in .gitignore format, options is a comma separated list of dpi, px and jpeg options. For example, --image-options 'figures/qualitative/*:300dpi,jpeg'.",
+        help="Provide options for image processing in the form '[path:]options'. path: is optional and can be in .gitignore format, options is a comma separated list of dpi, px, jpeg and background@COLOR options. Add background@COLOR to composite transparency onto a Pillow color name or hex color and remove alpha, with or without JPEG conversion. For example, --image-options 'figures/qualitative/*:300dpi,jpeg,background@white'.",
     )
     parser.add_argument(
         "--jpeg-quality",

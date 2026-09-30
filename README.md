@@ -19,12 +19,21 @@ arxivit /path/to/paper/main.tex
 # Convert images to JPEG at max 300 DPI in the final PDF and save to dir /path/to/output
 arxivit /path/to/paper/main.tex --image-options 'jpeg,300dpi' --output /path/to/output
 
+# Convert transparent images to JPEG by compositing them onto white
+arxivit /path/to/paper/main.tex --image-options 'jpeg,background@white,300dpi'
+
 # Convert images to max 300 DPI in the final PDF, images in figures/pca/ to max 1000px
 arxivit /path/to/paper/main.tex --image-options '300dpi' --image-options 'figures/pca/*:1000px'
 
 # Losslessly optimize all output PNGs with oxipng
 arxivit /path/to/paper/main.tex --oxipng
 ```
+
+The `background@COLOR` option alpha-blends transparent raster images onto the given
+color and removes transparency, independently of JPEG conversion. Use a Pillow
+color name or hex color, e.g. `background@white`, `background@black`, or
+`background@#204060`. Use it with `jpeg` to convert transparent PNGs to JPEG, or
+alone to keep PNG output.
 
 Use `--oxipng` for a good default, or `--oxipng=LEVEL` to select `0`–`6` or `max`.
 All levels are lossless; `max` takes much longer. Requires `oxipng` on `PATH`.

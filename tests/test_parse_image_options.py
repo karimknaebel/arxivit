@@ -79,6 +79,35 @@ from arxivit import DpiValue, ImageOptions, PxValue, parse_image_options
                 ImageOptions(sizes=[DpiValue(300)], jpeg=True, jpeg_quality=60),
             ),
         ),
+        (
+            "jpeg,background@white",
+            95,
+            (
+                Path("."),
+                ImageOptions(sizes=[], jpeg=True, jpeg_quality=95, background="white"),
+            ),
+        ),
+        (
+            "figures/*:background@#204060,300dpi,jpeg@60",
+            95,
+            (
+                Path("figures/transparent.png"),
+                ImageOptions(
+                    sizes=[DpiValue(300)],
+                    jpeg=True,
+                    jpeg_quality=60,
+                    background="#204060",
+                ),
+            ),
+        ),
+        (
+            "background@black",
+            95,
+            (
+                Path("."),
+                ImageOptions(sizes=[], jpeg=False, jpeg_quality=95, background="black"),
+            ),
+        ),
     ],
 )
 def test_my(opt, jpegq, expected):
