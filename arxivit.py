@@ -196,7 +196,7 @@ def arxivit(
                     style="dim",
                 )
                 + Text(
-                    f" {int((new_size / old_size) * 100)}%",
+                    f" {int((new_size / old_size) * 100)}%" if old_size else "",
                     style="blue bold",
                 )
             )
