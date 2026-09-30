@@ -20,8 +20,10 @@ LATEX_INJECT = r"""\AtBeginDocument{
 \makeatletter
 \newsavebox{\mytempbox}
 
+\ifdefined\adjincludegraphics
 \NewCommandCopy{\origadjincludegraphics}{\adjincludegraphics}
 \renewcommand{\adjincludegraphics}[2][]{\sbox{\mytempbox}{\origadjincludegraphics[#1]{#2}}\typeout{^^JIMAGE-INFO:  File=#2, Width=\the\wd\mytempbox, Height=\the\ht\mytempbox^^J}\usebox{\mytempbox}}
+\fi
 
 \NewCommandCopy{\origincludegraphics}{\includegraphics}
 \renewcommand{\includegraphics}[2][]{\sbox{\mytempbox}{\origincludegraphics[#1]{#2}}\typeout{^^JIMAGE-INFO:  File=#2, Width=\the\wd\mytempbox, Height=\the\ht\mytempbox^^J}\usebox{\mytempbox}}
@@ -382,6 +384,8 @@ def compile_latex(input_file: Path, compile_dir: Path) -> tuple[str, Path]:
     command = [
         "latexmk",
         "-pdf",
+        "-halt-on-error",
+        "-interaction=nonstopmode",
         f"-auxdir={compile_dir}",
         f"-outdir={compile_dir}",
         "-deps",
@@ -562,6 +566,8 @@ def cli():
                         command = [
                             "latexmk",
                             "-pdf",
+                            "-halt-on-error",
+                            "-interaction=nonstopmode",
                             tmp_tex,
                         ]
                         subprocess.run(
